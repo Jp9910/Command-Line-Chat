@@ -4,18 +4,20 @@ import com.rabbitmq.client.*;
 import java.io.IOException;
 
 import java.util.Scanner;
-import java.time.format.DateTimeFormatter;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 public class Chat {
 
+  private static String prompt = new String("");
+  
   public static void main(String[] argv) throws Exception 
   {
     
     Scanner sc = new Scanner(System.in);
     
     ConnectionFactory factory = new ConnectionFactory();
-    factory.setHost("3.91.68.223");
+    factory.setHost("23.22.251.211");
     factory.setUsername("jp");
     factory.setPassword("9910");
     factory.setVirtualHost("/");
@@ -39,8 +41,7 @@ public class Chat {
 
         String message = new String(body, "UTF-8");
         System.out.println("\n"+message);
-        //fazer uma variavel global indicando o prompt atual para imprimir aqui
-
+        System.out.print(prompt);
       }
     };
                       //(queue-name, autoAck, consumer);    
@@ -49,13 +50,15 @@ public class Chat {
     String destinatario = "";
     while(destinatario.isEmpty())
     {
-        System.out.print(">> ");
+        prompt = ">> ";
+        System.out.print(prompt);
         destinatario = sc.nextLine();
     }
     destinatario = destinatario.substring(1);
     while(true)
     {
-        System.out.print("@"+destinatario+">> ");
+        prompt = "@"+destinatario+">> ";
+        System.out.print(prompt);
         String msg = sc.nextLine();
         if(!msg.isEmpty())
         {
@@ -66,25 +69,20 @@ public class Chat {
               destinatario = msg.substring(1);
             }
             else
-            {/*
-              String formato_data = "dd/MM/yyyy";
-              String formato_hora = "HH:mm";
-              DateTimeFormatter dtf_data = new DateTimeFormatter.ofPattern(formato_data);
-              DateTimeFormatter dtf_hora = new DateTimeFormatter.ofPattern(formato_hora);
-              
-              LocalDateTime data = java.time.LocalDate.now();
-              LocalDateTime hora = java.time.LocalTime.now();
-              data_formatada = dtf_data.format(data);
-              hora_formatada = dtf_hora.format(hora);*/
-              
-              //(21/09/2016 às 20:53) marciocosta diz: E aí, Tarcisio! Vamos sim!
-              String data_formatada = java.time.LocalDate.now().toString();
-              String hora_formatada = java.time.LocalTime.now().toString();
+            {
+              //formato: (21/09/2016 às 20:53) marciocosta diz: E aí, Tarcisio! Vamos sim!
+              LocalDate data = java.time.LocalDate.now();
+              int mes = data.getMonthValue();
+              int dia = data.getDayOfMonth();
+              String mes_formatado = mes < 10? "0"+String.valueOf(mes) : String.valueOf(mes);
+              String dia_formatado = dia < 10? "0"+String.valueOf(dia) : String.valueOf(dia);
+              String data_formatada = dia_formatado+"/"+mes_formatado+"/"+String.valueOf(data.getYear());
+              LocalTime hora = java.time.LocalTime.now();
+              String hora_formatada = String.valueOf(hora.getHour()) +":"+ String.valueOf(hora.getMinute());
               
               String conteudo = new String(msg);
               msg = (  "("+data_formatada+" às "+hora_formatada+") "+QUEUE_NAME+" diz: "+conteudo   );
               channel.basicPublish("",destinatario,null,msg.getBytes("UTF-8"));
-              System.out.println(" [x] Mensagem enviada: '" + msg + "'");
             }
         }
     }
