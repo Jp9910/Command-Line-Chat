@@ -17,7 +17,7 @@ public class Chat {
     Scanner sc = new Scanner(System.in);
     
     ConnectionFactory factory = new ConnectionFactory();
-    factory.setHost("23.22.251.211");
+    factory.setHost("18.215.145.181");
     factory.setUsername("jp");
     factory.setPassword("9910");
     factory.setVirtualHost("/");
@@ -48,27 +48,33 @@ public class Chat {
     channel.basicConsume(QUEUE_NAME, true,    consumer);
     
     String destinatario = "";
-    while(destinatario.isEmpty())
+    int dest_compare = -1;
+    while(destinatario.isEmpty() || dest_compare!=0) //Enquanto o primeiro caractere for vazio ou não for '@'
     {
+        System.out.println("Digite '@<destinatário>' para escolher o destinatário. Ex: @joao");
         prompt = ">> ";
         System.out.print(prompt);
         destinatario = sc.nextLine();
+        if(!destinatario.isEmpty())
+          dest_compare = Character.compare(destinatario.charAt(0),'@');
     }
     destinatario = destinatario.substring(1);
-    while(true)
+    System.out.println("Enviando mensagem para "+destinatario+". Para trocar o destinatario digite '@<destinatario>'. Para sair, use CTRL+C.");
+    while(true) //começar o envio de mensagens
     {
         prompt = "@"+destinatario+">> ";
         System.out.print(prompt);
         String msg = sc.nextLine();
-        if(!msg.isEmpty())
+        if(!msg.isEmpty()) //se a mensagem não for vazia
         {
             char primeirochar = msg.charAt(0);
             int compare = Character.compare(primeirochar,'@');
-            if(compare == 0)
+            if(compare == 0) //se o primeiro caractere for '@', trocar o destinatário
             {
               destinatario = msg.substring(1);
+              System.out.println("Enviando mensagem para "+destinatario+". Para trocar o destinatario digite '@<destinatario>'. Para sair, use CTRL+C.");
             }
-            else
+            else //se não, enviar mensagem para o destinatário
             {
               //formato: (21/09/2016 às 20:53) marciocosta diz: E aí, Tarcisio! Vamos sim!
               LocalDate data = java.time.LocalDate.now();
