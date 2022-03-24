@@ -52,5 +52,18 @@
        <artifactId>slf4j-simple</artifactId>
        <version>1.7.30</version>
    </dependency>
+   <!-- https://mvnrepository.com/artifact/com.google.protobuf/protobuf-java -->
+    <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-java</artifactId>
+        <version>4.0.0-rc-2</version>
+    </dependency>
+    <!-- https://mvnrepository.com/artifact/com.google.protobuf/protobuf-java-util -->
+    <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-java-util</artifactId>
+        <version>4.0.0-rc-2</version>
+        <scope>runtime</scope>
+    </dependency>
   </dependencies>
 </project>
