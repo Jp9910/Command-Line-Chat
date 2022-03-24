@@ -10,22 +10,24 @@ import com.google.protobuf.ByteString;
 
 public class Chat {
 
+  private static Scanner sc = new Scanner(System.in);
   private static String prompt = new String("");
+  private static String USUARIO = "";
+  private static String pessoaDest = "";
+  private static String grupoDest = "";
+  private static boolean enviarMensagem = false;
+  private static Channel channel;
   
   public static void main(String[] argv) throws Exception 
   {
-    
-    Scanner sc = new Scanner(System.in);
-    
     ConnectionFactory factory = new ConnectionFactory();
-    factory.setHost("54.235.231.127");
+    factory.setHost("52.91.160.18");
     factory.setUsername("jp");
     factory.setPassword("9910");
     factory.setVirtualHost("/");
     Connection connection = factory.newConnection();
-    Channel channel = connection.createChannel();
+    channel = connection.createChannel();
     
-    String USUARIO = "";
     while(USUARIO.isEmpty())
     {
       System.out.print("User: ");
@@ -57,68 +59,167 @@ public class Chat {
                       //(queue-name, autoAck, consumer);    
     channel.basicConsume(USUARIO, true,    consumer);
     
-    String destinatario = "";
-    int dest_compare = -1;
-    while(destinatario.isEmpty() || dest_compare!=0) //Enquanto o primeiro caractere for vazio ou não for '@'
+    Chat.imprimirAjuda();
+    prompt = ">> ";
+    while(true) //iniciar o chat
     {
-        System.out.println("Digite '@<destinatário>' para escolher o destinatário. Ex: @joao");
-        prompt = ">> ";
-        System.out.print(prompt);
-        destinatario = sc.nextLine();
-        if(!destinatario.isEmpty())
-          dest_compare = Character.compare(destinatario.charAt(0),'@');
+        Chat.proximaOperacao();
     }
-    destinatario = destinatario.substring(1);
-    System.out.println("Enviando mensagem para "+destinatario+". Para trocar o destinatario digite '@<destinatario>'. Para sair, use CTRL+C.");
-    while(true) //começar o envio de mensagens
+  }
+  
+  public static void proximaOperacao() throws java.io.IOException
+  {
+    System.out.print(prompt);
+    String operacao = sc.nextLine();
+    if(!operacao.isEmpty()) //se a operação não for vazia
     {
-        prompt = "@"+destinatario+">> ";
-        System.out.print(prompt);
-        String msg = sc.nextLine();
-        if(!msg.isEmpty()) //se a mensagem não for vazia
+        char primeirochar = operacao.charAt(0);
+        switch (primeirochar)
         {
-            char primeirochar = msg.charAt(0);
-            int compare = Character.compare(primeirochar,'@');
-            if(compare == 0) //se o primeiro caractere for '@', trocar o destinatário
-            {
-              destinatario = msg.substring(1);
-              System.out.println("Enviando mensagem para "+destinatario+". Para trocar o destinatario digite '@<destinatario>'. Para sair, use CTRL+C.");
-            }
-            else //se não, enviar mensagem para o destinatário
-            {
-              /*
-              * Montar o protocol buffer. O arquivo "MensagemProto.java" contém todas as 'messages' (classe Mensagem e classe Conteúdo).
-              * Builders têm getters e setters. Servem para preencher o objeto. Usar .build() para transformar em uma Message.
-              * Messages têm apenas getters e são imutáveis.
-              */
-              LocalDate data = java.time.LocalDate.now();
-              int mes = data.getMonthValue();
-              int dia = data.getDayOfMonth();
-              String mes_formatado = mes < 10? "0"+String.valueOf(mes) : String.valueOf(mes);
-              String dia_formatado = dia < 10? "0"+String.valueOf(dia) : String.valueOf(dia);
-              String data_formatada = dia_formatado+"/"+mes_formatado+"/"+String.valueOf(data.getYear());
-              LocalTime hora = java.time.LocalTime.now();
-              String hora_formatada = String.valueOf(hora.getHour()) +":"+ String.valueOf(hora.getMinute());
-              
-              //Montar o conteúdo da mensagem (classe Conteúdo)
-              MensagemProto.Conteudo.Builder conteudo = MensagemProto.Conteudo.newBuilder();
-              conteudo.setTipo("text/plain")
-                      .setCorpo(ByteString.copyFromUtf8(msg));
-              
-              //Montar a mensagem (classe Mensagem), setando o conteúdo para o montado anteriormente.
-              MensagemProto.Mensagem.Builder mensagem = MensagemProto.Mensagem.newBuilder();
-              MensagemProto.Mensagem mensagem_construida = 
-                mensagem.setEmissor(USUARIO)
-                        .setData(data_formatada)
-                        .setHora(hora_formatada)
-                        .setConteudo(conteudo)
-                        .build();
-                      
-              //Serializar a Mensagem em um vetor de bytes para depois enviar
-              byte[] mensagem_serializada = mensagem_construida.toByteArray();
-              channel.basicPublish("",destinatario,null,mensagem_serializada);
-            }
+          case '@': //operação tipo trocar para mensagem para pessoa
+                pessoaDest = operacao.substring(1);
+                grupoDest = "";
+                prompt = '@'+pessoaDest+">> ";
+                System.out.println("Enviando mensagens para "+pessoaDest+".");
+                enviarMensagem = true;
+                break;
+          
+          case '!': //operação tipo comando
+                String[] argumentos = operacao.split(" ");
+                String comando = argumentos[0].substring(1);
+                if(comando.equals("addGroup")) //criar novo grupo (exchange do tipo fanout)
+                {
+                    if(argumentos.length == 2)
+                    {
+                        String nomeDoGrupo = argumentos[1];
+                        channel.exchangeDeclare(nomeDoGrupo,"fanout");
+                        channel.queueBind(USUARIO, nomeDoGrupo, "");
+                    }
+                }
+                else if(comando.equals("addUser")) //adicionar usuário ao grupo
+                {
+                    if(argumentos.length == 3)
+                    {
+                        String novoIntegrante = argumentos[1];
+                        String nomeDoGrupo = argumentos[2];
+                        channel.queueBind(novoIntegrante, nomeDoGrupo, "");
+                    }
+                    else {System.out.println("Comando inválido.");}
+                }
+                else if(comando.equals("delFromGroup")) //deletar usuário do grupo
+                {
+                    if(argumentos.length == 3)
+                    {
+                      String removerIntegrante = argumentos[1];
+                      String nomeDoGrupo = argumentos[2];
+                      channel.queueUnbind(removerIntegrante, nomeDoGrupo, "");
+                    }
+                    else {System.out.println("Comando inválido.");}
+                }
+                else if(comando.equals("removeGroup")) //deletar grupo
+                {
+                    if(argumentos.length == 2)
+                        channel.exchangeDelete(argumentos[1]);
+                }
+                else {System.out.println("Comando inválido.");}
+                break;
+          
+          case '#': //operação tipo trocar para mensagem para grupo
+                grupoDest = operacao.substring(1);
+                pessoaDest = "";
+                prompt = '#'+grupoDest+">> ";
+                System.out.println("Enviando mensagens para o grupo "+grupoDest+".");
+                enviarMensagem = true;
+                break;
+          
+          default: //operação tipo enviar mensagem
+                /*
+                * Montar o protocol buffer. O arquivo "MensagemProto.java" contém todas as 'messages' (classe Mensagem e classe Conteúdo).
+                * Builders têm getters e setters. Servem para preencher o objeto. Usar .build() para transformar em uma Message.
+                * Messages têm apenas getters e são imutáveis.
+                */
+                if(enviarMensagem)
+                {
+                  MensagemProto.Mensagem mensagem_construida = Chat.montarMensagem(operacao,USUARIO);
+                  
+                  //Serializar a Mensagem em um vetor de bytes para depois enviar
+                  byte[] mensagem_serializada = mensagem_construida.toByteArray();
+                  
+                  if(!pessoaDest.isEmpty())                                           //mensagem para pessoa
+                    channel.basicPublish("",pessoaDest,null,mensagem_serializada);
+                  else                                                                //mensagem para grupo
+                    channel.basicPublish(grupoDest,"",null,mensagem_serializada);
+                  
+                }
+                else{System.out.println("Operação inválida.");}
         }
     }
+  }
+  
+  public static MensagemProto.Mensagem montarMensagem(String msg, String emissor)
+  {
+    //Montar o conteúdo da mensagem (classe Conteúdo)
+    MensagemProto.Conteudo.Builder conteudo = MensagemProto.Conteudo.newBuilder();
+    conteudo.setTipo("text/plain")
+            .setCorpo(ByteString.copyFromUtf8(msg));
+    
+    String data = Chat.getData();
+    String hora = Chat.getHora();
+    
+    //Montar a mensagem (classe Mensagem), definindo o conteúdo para o montado acima.
+    MensagemProto.Mensagem.Builder mensagem = MensagemProto.Mensagem.newBuilder();
+    MensagemProto.Mensagem mensagem_construida = 
+      mensagem.setEmissor(emissor)
+              .setData(data)
+              .setHora(hora)
+              .setConteudo(conteudo)
+              .build();
+    
+    return mensagem_construida;
+  }
+  
+  /*
+  * Retorna a hora atual já formatada para a troca de mensagens
+  */
+  public static String getHora()
+  {
+    LocalTime hora = java.time.LocalTime.now();
+    String hora_formatada = String.valueOf(hora.getHour()) +":"+ String.valueOf(hora.getMinute());
+    
+    return hora_formatada;
+  }
+  
+  /*
+  * Retorna a data atual já formatada para a troca de mensagens
+  */
+  public static String getData()
+  {
+    LocalDate data = java.time.LocalDate.now();
+    int mes = data.getMonthValue();
+    int dia = data.getDayOfMonth();
+    String mes_formatado = mes < 10? "0"+String.valueOf(mes) : String.valueOf(mes);
+    String dia_formatado = dia < 10? "0"+String.valueOf(dia) : String.valueOf(dia);
+    String data_formatada = dia_formatado+"/"+mes_formatado+"/"+String.valueOf(data.getYear());
+    
+    return data_formatada;
+  }
+  
+  public static void imprimirAjuda()
+  {
+    System.out.println("/---------------------------------------------------------------------------\\");
+    System.out.println("| Digite '@<destinatário>' para enviar mensagem para uma pessoa. Ex: @joao  |");
+    System.out.println("| Digite '!<comando>' para executar um comando. Ex: !addGroup amigos       |");
+    System.out.println("| Digite '#<grupo>' para enviar mensagem para um grupo. Ex: #amigos         |");
+    System.out.println("\\---------------------------------------------------------------------------/");
+  }
+  
+  public static void imprimirComandos()
+  {
+    System.out.println("/-----------------------------------------------------------------------------------------------------------------\\");
+    System.out.println("| Digite '!addGroup <nome_do_grupo>' para criar um novo grupo. Ex: !addGroup amigos                                |");
+    System.out.println("| Digite '!addUser <usuario> <nome_do_grupo>' para adicionar um usuário a um grupo. Ex: !addUser joao amigos       |");
+    System.out.println("| Digite '!delFromGroup <usuário> <nome_do_grupo>' para remover um usuário do grupo. Ex: !delFromGroup joao amigos |");
+    System.out.println("| Digite '!removeGroup <nome_do_grupo>' para deletar um grupo. Ex: !removeGroup amigos                             |");
+    System.out.println("\\-----------------------------------------------------------------------------------------------------------------/");
   }
 }
