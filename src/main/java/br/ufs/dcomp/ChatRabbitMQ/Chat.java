@@ -21,7 +21,7 @@ public class Chat {
   public static void main(String[] argv) throws Exception 
   {
     ConnectionFactory factory = new ConnectionFactory();
-    factory.setHost("52.91.160.18");
+    factory.setHost("54.90.238.88");
     factory.setUsername("jp");
     factory.setPassword("9910");
     factory.setVirtualHost("/");
@@ -46,12 +46,18 @@ public class Chat {
         String emissor = mensagem_recebida.getEmissor();
         String data = mensagem_recebida.getData();
         String hora = mensagem_recebida.getHora();
+        String grupo = mensagem_recebida.getGrupo();
         
         MensagemProto.Conteudo conteudo = mensagem_recebida.getConteudo();
         String texto = conteudo.getCorpo().toStringUtf8();
         
-        // Formato da mensagem: (21/09/2016 às 20:53) marciocosta diz: E aí, Tarcisio! Vamos sim!
-        String msg_formatada = (  "("+data+" às "+hora+") "+emissor+" diz: "+texto   );
+        // Formato da mensagem para usuário: (21/09/2016 às 20:53) marciocosta diz: E aí, Tarcisio! Vamos sim!
+        // Formato da mensagem para grupo:   (21/09/2018 às 21:50) joaosantos#amigos diz: Olá, amigos!!!
+        String msg_formatada = "";
+        if(!grupo.isEmpty())
+          msg_formatada = (  "("+data+" às "+hora+") "+emissor+"#"+grupo+" diz: "+texto   );
+        else
+          msg_formatada = (  "("+data+" às "+hora+") "+emissor+" diz: "+texto   );
         System.out.println("\n"+msg_formatada);
         System.out.print(prompt);
       }
@@ -60,6 +66,7 @@ public class Chat {
     channel.basicConsume(USUARIO, true,    consumer);
     
     Chat.imprimirAjuda();
+    Chat.imprimirComandos();
     prompt = ">> ";
     while(true) //iniciar o chat
     {
@@ -140,15 +147,20 @@ public class Chat {
                 */
                 if(enviarMensagem)
                 {
-                  MensagemProto.Mensagem mensagem_construida = Chat.montarMensagem(operacao,USUARIO);
+                  boolean isGroupMessage = pessoaDest.isEmpty();
+                  MensagemProto.Mensagem mensagem_construida;
+                  if(isGroupMessage)
+                    mensagem_construida = Chat.MontarMensagemParaGrupo(operacao,USUARIO,grupoDest);
+                  else
+                    mensagem_construida = Chat.MontarMensagemParaUsuario(operacao,USUARIO);
                   
                   //Serializar a Mensagem em um vetor de bytes para depois enviar
                   byte[] mensagem_serializada = mensagem_construida.toByteArray();
                   
-                  if(!pessoaDest.isEmpty())                                           //mensagem para pessoa
-                    channel.basicPublish("",pessoaDest,null,mensagem_serializada);
-                  else                                                                //mensagem para grupo
-                    channel.basicPublish(grupoDest,"",null,mensagem_serializada);
+                  if(isGroupMessage)
+                    channel.basicPublish(grupoDest,"",null,mensagem_serializada); //mensagem para pessoa
+                  else
+                    channel.basicPublish("",pessoaDest,null,mensagem_serializada); //mensagem para grupo
                   
                 }
                 else{System.out.println("Operação inválida.");}
@@ -156,7 +168,10 @@ public class Chat {
     }
   }
   
-  public static MensagemProto.Mensagem montarMensagem(String msg, String emissor)
+  /*
+  * Função auxiliar para montar uma mensagem que será enviada para um usuário usando protocol buffers
+  */
+  public static MensagemProto.Mensagem MontarMensagemParaUsuario(String msg, String emissor)
   {
     //Montar o conteúdo da mensagem (classe Conteúdo)
     MensagemProto.Conteudo.Builder conteudo = MensagemProto.Conteudo.newBuilder();
@@ -179,7 +194,33 @@ public class Chat {
   }
   
   /*
-  * Retorna a hora atual já formatada para a troca de mensagens
+  * Função auxiliar para montar uma mensagem que será enviada para grupo usando protocol buffers
+  */
+  public static MensagemProto.Mensagem MontarMensagemParaGrupo(String msg, String emissor, String grupoDest)
+  {
+    //Montar o conteúdo da mensagem (classe Conteúdo)
+    MensagemProto.Conteudo.Builder conteudo = MensagemProto.Conteudo.newBuilder();
+    conteudo.setTipo("text/plain")
+            .setCorpo(ByteString.copyFromUtf8(msg));
+    
+    String data = Chat.getData();
+    String hora = Chat.getHora();
+    
+    //Montar a mensagem (classe Mensagem), definindo o conteúdo para o montado acima.
+    MensagemProto.Mensagem.Builder mensagem = MensagemProto.Mensagem.newBuilder();
+    MensagemProto.Mensagem mensagem_construida = 
+      mensagem.setEmissor(emissor)
+              .setData(data)
+              .setHora(hora)
+              .setGrupo(grupoDest)
+              .setConteudo(conteudo)
+              .build();
+    
+    return mensagem_construida;
+  }
+  
+  /*
+  * Função auxiliar para retornar a hora atual já formatada para a troca de mensagens
   */
   public static String getHora()
   {
@@ -190,7 +231,7 @@ public class Chat {
   }
   
   /*
-  * Retorna a data atual já formatada para a troca de mensagens
+  * Função auxiliar para retornar a data atual já formatada para a troca de mensagens
   */
   public static String getData()
   {
@@ -204,22 +245,33 @@ public class Chat {
     return data_formatada;
   }
   
+  /*
+  * Função auxiliar imprimir a lista de operações
+  */
   public static void imprimirAjuda()
   {
-    System.out.println("/---------------------------------------------------------------------------\\");
+    System.out.println("+----------------------------LISTA DE OPERAÇÕES-----------------------------+");
     System.out.println("| Digite '@<destinatário>' para enviar mensagem para uma pessoa. Ex: @joao  |");
-    System.out.println("| Digite '!<comando>' para executar um comando. Ex: !addGroup amigos       |");
+    System.out.println("| Digite '!<comando>' para executar um comando. Ex: !addGroup amigos        |");
     System.out.println("| Digite '#<grupo>' para enviar mensagem para um grupo. Ex: #amigos         |");
-    System.out.println("\\---------------------------------------------------------------------------/");
+    System.out.println("+---------------------------------------------------------------------------+");
   }
   
+  /*
+  * Função auxiliar imprimir a lista de comandos
+  */
   public static void imprimirComandos()
   {
-    System.out.println("/-----------------------------------------------------------------------------------------------------------------\\");
+    System.out.println("/------------------------------------------------LISTA DE COMANDOS-------------------------------------------------\\");
     System.out.println("| Digite '!addGroup <nome_do_grupo>' para criar um novo grupo. Ex: !addGroup amigos                                |");
     System.out.println("| Digite '!addUser <usuario> <nome_do_grupo>' para adicionar um usuário a um grupo. Ex: !addUser joao amigos       |");
     System.out.println("| Digite '!delFromGroup <usuário> <nome_do_grupo>' para remover um usuário do grupo. Ex: !delFromGroup joao amigos |");
     System.out.println("| Digite '!removeGroup <nome_do_grupo>' para deletar um grupo. Ex: !removeGroup amigos                             |");
-    System.out.println("\\-----------------------------------------------------------------------------------------------------------------/");
+    System.out.println("\\------------------------------------------------------------------------------------------------------------------/");
   }
 }
+
+//Dúvidas
+//uma pessoa pode enviar mensagem para um grupo que ela não faz parte?
+//quem envia mensagem para o grupo também recebe a própria mensagem que enviou?
+//
