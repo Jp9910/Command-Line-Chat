@@ -16,27 +16,34 @@ public class Chat {
   private static String pessoaDest = "";
   private static String grupoDest = "";
   private static boolean enviarMensagem = false;
-  private static Channel channel;
+  private static Channel channelT;
+  private static Channel channelF;
   
   public static void main(String[] argv) throws Exception 
   {
     ConnectionFactory factory = new ConnectionFactory();
-    factory.setHost("54.90.238.88");
+    factory.setHost("54.210.34.218");
     factory.setUsername("jp");
     factory.setPassword("9910");
     factory.setVirtualHost("/");
     Connection connection = factory.newConnection();
-    channel = connection.createChannel();
+    
+    channelT = connection.createChannel(); //canal para mensagens de texto
+    channelF = connection.createChannel(); //canal para mensagens de arquivo
     
     while(USUARIO.isEmpty())
     {
       System.out.print("User: ");
       USUARIO = sc.nextLine();
     }
+    //NOME_FILA_TEXTO = USUARIO+"-T";
+    //NOME_FILA_ARQ = USUARIO+"-F";
                       //(queue-name, durable, exclusive, auto-delete, params); 
-    channel.queueDeclare(USUARIO, false,   false,     false,       null);
+    channelT.queueDeclare(USUARIO+"-T", false,   false,     false,       null); //Fila para mensagens de texto
+    channelF.queueDeclare(USUARIO+"-F", false,   false,     false,       null); //Fila para mensagens de arquivo
     
-    Consumer consumer = new DefaultConsumer(channel) 
+    //declarar comportamento da função de recebimento da fila de textos
+    Consumer consumerT = new DefaultConsumer(channelT) 
     {
       public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException 
       {
@@ -62,8 +69,21 @@ public class Chat {
         System.out.print(prompt);
       }
     };
-                      //(queue-name, autoAck, consumer);    
-    channel.basicConsume(USUARIO, true,    consumer);
+    
+    //declarar comportamento da função de recebimento da fila de arquivos
+    Consumer consumerF = new DefaultConsumer(channelF) 
+    {
+      public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException 
+      {
+        // O que o receptor fará quando chegar uma mensagem. "body" é o conteúdo da mensagem (representado em bytes)
+        System.out.println("msg de arquivo");
+      }
+    };
+    
+    ChatThread threadT = new ChatThread("threadT", channelT, consumerT, USUARIO);
+    ChatThread threadF = new ChatThread("threadF", channelF, consumerF, USUARIO);
+    threadT.start();
+    threadF.start();
     
     Chat.imprimirAjuda();
     Chat.imprimirComandos();
@@ -94,13 +114,14 @@ public class Chat {
           case '!': //operação tipo comando
                 String[] argumentos = operacao.split(" ");
                 String comando = argumentos[0].substring(1);
-                if(comando.equals("addGroup")) //criar novo grupo (exchange do tipo fanout)
+                if(comando.equals("addGroup")) //criar novo grupo (exchange do tipo ~~fanout~~ topic)
                 {
                     if(argumentos.length == 2)
                     {
                         String nomeDoGrupo = argumentos[1];
-                        channel.exchangeDeclare(nomeDoGrupo,"fanout");
-                        channel.queueBind(USUARIO, nomeDoGrupo, "");
+                        channelT.exchangeDeclare(nomeDoGrupo,"topic");
+                        channelT.queueBind(USUARIO+"-T", nomeDoGrupo, "");
+                        channelF.queueBind(USUARIO+"-F", nomeDoGrupo, "");
                     }
                 }
                 else if(comando.equals("addUser")) //adicionar usuário ao grupo
@@ -109,7 +130,8 @@ public class Chat {
                     {
                         String novoIntegrante = argumentos[1];
                         String nomeDoGrupo = argumentos[2];
-                        channel.queueBind(novoIntegrante, nomeDoGrupo, "");
+                        channelT.queueBind(novoIntegrante+"-T", nomeDoGrupo, "");
+                        channelF.queueBind(novoIntegrante+"-F", nomeDoGrupo, "");
                     }
                     else {System.out.println("Comando inválido.");}
                 }
@@ -119,14 +141,15 @@ public class Chat {
                     {
                       String removerIntegrante = argumentos[1];
                       String nomeDoGrupo = argumentos[2];
-                      channel.queueUnbind(removerIntegrante, nomeDoGrupo, "");
+                      channelT.queueUnbind(removerIntegrante+"-T", nomeDoGrupo, "");
+                      channelF.queueUnbind(removerIntegrante+"-F", nomeDoGrupo, "");
                     }
                     else {System.out.println("Comando inválido.");}
                 }
                 else if(comando.equals("removeGroup")) //deletar grupo
                 {
                     if(argumentos.length == 2)
-                        channel.exchangeDelete(argumentos[1]);
+                        channelT.exchangeDelete(argumentos[1]);
                 }
                 else {System.out.println("Comando inválido.");}
                 break;
@@ -158,9 +181,9 @@ public class Chat {
                   byte[] mensagem_serializada = mensagem_construida.toByteArray();
                   
                   if(isGroupMessage)
-                    channel.basicPublish(grupoDest,"",null,mensagem_serializada); //mensagem para pessoa
+                    channelT.basicPublish(grupoDest+"-T","",null,mensagem_serializada); //mensagem para grupo
                   else
-                    channel.basicPublish("",pessoaDest,null,mensagem_serializada); //mensagem para grupo
+                    channelT.basicPublish("",pessoaDest+"-T",null,mensagem_serializada); //mensagem para pessoa
                   
                 }
                 else{System.out.println("Operação inválida.");}
@@ -275,3 +298,9 @@ public class Chat {
 //uma pessoa pode enviar mensagem para um grupo que ela não faz parte?
 //quem envia mensagem para o grupo também recebe a própria mensagem que enviou?
 //
+//
+//To do:
+//criar threads para o envio
+//criar um canal para texto e um canal para arquivos (pode usar o mesmo canal para consumir e para enviar - 1 canal para consumir e enviar texto, e 1 canal para consumir e enviar arquivos)
+//criar fila para textos e fila para arquivos
+//criar exchange do tipo Topic. Esse exchange usa uma tag para escolher a fila para que vai mandar a mensagem (que pode ser texto ou arquivo)
