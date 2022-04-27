@@ -23,7 +23,9 @@ public class ThreadRecebimento extends Thread
                                 //(queue-name, autoAck, consumer);    
             canal.basicConsume(usuario+tipoDeMensagem, true,    consumer); //consumir da fila recebida (de texto ou de arquivo)
         } catch (Exception e){
-            System.out.println(e);
+            System.out.println(" !! Erro na thread de recebimento. !! ");
+            //e.printStackTrace();
+            System.out.print("[thread]"+Chat.getPrompt());
         }
     }
 }
