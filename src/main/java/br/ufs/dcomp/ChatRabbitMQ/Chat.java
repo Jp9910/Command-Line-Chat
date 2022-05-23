@@ -4,8 +4,6 @@ import com.rabbitmq.client.*;
 import java.io.IOException;
 
 import java.util.Scanner;
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.io.File;
 import java.io.OutputStream;
 import java.io.FileOutputStream;
@@ -26,7 +24,7 @@ public class Chat {
   public static void main(String[] argv) throws Exception 
   {
     ConnectionFactory factory = new ConnectionFactory();
-    factory.setHost("3.227.213.73");
+    factory.setHost("RabbitMQ-LB-ef9f61bc629530a1.elb.us-east-1.amazonaws.com");
     factory.setUsername("jp");
     factory.setPassword("9910");
     factory.setVirtualHost("/");
@@ -124,8 +122,8 @@ public class Chat {
     threadT.start();
     threadF.start();
     
-    Chat.imprimirAjuda();
-    Chat.imprimirComandos();
+    Chat_Utils.imprimirAjuda();
+    Chat_Utils.imprimirComandos();
     prompt = "["+USUARIO+"] >> ";
     while(true) //iniciar o chat
     {
@@ -321,8 +319,8 @@ public class Chat {
               .setCorpo(ByteString.copyFrom(conteudoArquivo))
               .setNome(nomeArquivo);
       
-      String data = Chat.getData();
-      String hora = Chat.getHora();
+      String data = Chat_Utils.getData();
+      String hora = Chat_Utils.getHora();
       
       //Montar a mensagem (classe Mensagem), definindo o conteúdo para o montado acima.
       MensagemProto.Mensagem.Builder mensagem = MensagemProto.Mensagem.newBuilder();
@@ -347,8 +345,8 @@ public class Chat {
       conteudo.setTipo("text/plain")
               .setCorpo(ByteString.copyFromUtf8(texto));
       
-      String data = Chat.getData();
-      String hora = Chat.getHora();
+      String data = Chat_Utils.getData();
+      String hora = Chat_Utils.getHora();
       
       //Montar a mensagem (classe Mensagem), definindo o conteúdo para o montado acima.
       MensagemProto.Mensagem.Builder mensagem = MensagemProto.Mensagem.newBuilder();
@@ -369,68 +367,16 @@ public class Chat {
   {
     return prompt;
   }
-
-  /*
-  * Função auxiliar para retornar a hora atual já formatada para a troca de mensagens
-  */
-  private static String getHora()
-  {
-      LocalTime hora = java.time.LocalTime.now();
-      String hora_formatada = String.valueOf(hora.getHour()) +":"+ String.valueOf(hora.getMinute());
-      
-      return hora_formatada;
-  }
-  
-  /*
-  * Função auxiliar para retornar a data atual já formatada para a troca de mensagens
-  */
-  private static String getData()
-  {
-      LocalDate data = java.time.LocalDate.now();
-      int mes = data.getMonthValue();
-      int dia = data.getDayOfMonth();
-      String mes_formatado = mes < 10? "0"+String.valueOf(mes) : String.valueOf(mes);
-      String dia_formatado = dia < 10? "0"+String.valueOf(dia) : String.valueOf(dia);
-      String data_formatada = dia_formatado+"/"+mes_formatado+"/"+String.valueOf(data.getYear());
-      
-      return data_formatada;
-  }
-  
-  /*
-  * Função auxiliar imprimir a lista de operações
-  */
-  private static void imprimirAjuda()
-  {
-      System.out.println("+----------------------------LISTA DE OPERAÇÕES-----------------------------+");
-      System.out.println("| Digite '@<destinatário>' para enviar mensagem para uma pessoa. Ex: @joao  |");
-      System.out.println("| Digite '!<comando>' para executar um comando. Ex: !addGroup amigos        |");
-      System.out.println("| Digite '#<grupo>' para enviar mensagem para um grupo. Ex: #amigos         |");
-      System.out.println("+---------------------------------------------------------------------------+");
-  }
-  
-  /*
-  * Função auxiliar imprimir a lista de comandos
-  */
-  private static void imprimirComandos()
-  {
-      System.out.println("/------------------------------------------------LISTA DE COMANDOS-------------------------------------------------\\");
-      System.out.println("| Digite '!addGroup <nome_do_grupo>' para criar um novo grupo. Ex: !addGroup amigos                                |");
-      System.out.println("| Digite '!addUser <usuario> <nome_do_grupo>' para adicionar um usuário a um grupo. Ex: !addUser joao amigos       |");
-      System.out.println("| Digite '!delFromGroup <usuário> <nome_do_grupo>' para remover um usuário do grupo. Ex: !delFromGroup joao amigos |");
-      System.out.println("| Digite '!removeGroup <nome_do_grupo>' para deletar um grupo. Ex: !removeGroup amigos                             |");
-      System.out.println("| Digite '!upload <caminho_ate_o_arquivo>' para enviar um arquivo ao destinatário atual                            |");
-      System.out.println("\\------------------------------------------------------------------------------------------------------------------/");
-  }
 }
 //!upload /home/ubuntu/environment/chat-em-linha-de-comando-via-rabbitmq-Jp9910/ArquivosParaEnviar/arquivoteste.txt
 //!upload /home/ubuntu/environment/chat-em-linha-de-comando-via-rabbitmq-Jp9910/ArquivosParaEnviar/livro.pdf
 
 //To do:
 //criar threads para o recebimento -- ok
-//criar threads para o envio
-//criar um canal para texto e um canal para arquivos (pode usar o mesmo canal para consumir e para enviar - 1 canal para consumir e enviar texto, e 1 canal para consumir e enviar arquivos)
+//criar threads para o envio -- ok
+//criar um canal para texto e um canal para arquivos -- ok (pode usar o mesmo canal para consumir e para enviar - 1 canal para consumir e enviar texto, e 1 canal para consumir e enviar arquivos)
 //criar fila para textos e fila para arquivos -- ok
-//criar exchange do tipo Topic. Esse exchange usa uma tag para escolher a fila para que vai mandar a mensagem (que pode ser texto ou arquivo)
+//criar exchange do tipo Topic. -- ok (Esse exchange usa uma routingKey para escolher a fila para que vai mandar a mensagem (que pode ser texto ou arquivo))
 
 // <!-- BUGS: -->
 //bug upload antes de escolher destino -- ok
