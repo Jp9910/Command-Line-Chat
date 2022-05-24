@@ -7,4 +7,4 @@ Ver demais arquivos das etapas do projeto.
 Grupo:
 - João Paulo Feitosa Secundo
 
-(Optei por fazer sozinho, espero que não tenha problema)
+(Optei por fazer sozinho)
