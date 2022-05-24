@@ -51,6 +51,8 @@ public class Chat_Utils {
       System.out.println("| Digite '!delFromGroup <usuário> <nome_do_grupo>' para remover um usuário do grupo. Ex: !delFromGroup joao amigos |");
       System.out.println("| Digite '!removeGroup <nome_do_grupo>' para deletar um grupo. Ex: !removeGroup amigos                             |");
       System.out.println("| Digite '!upload <caminho_ate_o_arquivo>' para enviar um arquivo ao destinatário atual                            |");
+      System.out.println("| Digite '!listUsers <nome_do_grupo>' para ver uma lista de todos os usuários do grupo                             |");
+      System.out.println("| Digite '!listGroups' para ver uma lista dos grupos dos quais você faz parte                                      |");
       System.out.println("\\------------------------------------------------------------------------------------------------------------------/");
     }
 }

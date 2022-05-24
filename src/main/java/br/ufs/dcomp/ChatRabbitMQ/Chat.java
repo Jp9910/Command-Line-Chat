@@ -2,13 +2,20 @@ package br.ufs.dcomp.ChatRabbitMQ;
 
 import com.rabbitmq.client.*;
 import java.io.IOException;
-
 import java.util.Scanner;
+import java.util.Arrays;
 import java.io.File;
 import java.io.OutputStream;
 import java.io.FileOutputStream;
 import java.nio.file.*;
 import com.google.protobuf.ByteString;
+// <!-- request http -->
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 public class Chat {
 
@@ -20,6 +27,10 @@ public class Chat {
   private static boolean escolheuDestinatario = false;
   private static Channel channelT;
   private static Channel channelF;
+  private static String login;
+  private static String authHeaderName;
+  private static String authHeaderValue;
+  private static final String restResource = "http://RabbitMQ-LB-ef9f61bc629530a1.elb.us-east-1.amazonaws.com";
   
   public static void main(String[] argv) throws Exception 
   {
@@ -121,7 +132,11 @@ public class Chat {
     ThreadRecebimento threadF = new ThreadRecebimento("threadF", channelF, consumerF, USUARIO, "-F");
     threadT.start();
     threadF.start();
-    
+
+    login = "jp" + ":" + "9910";
+    authHeaderName = "Authorization";
+    authHeaderValue = "Basic " + java.util.Base64.getEncoder().encodeToString(login.getBytes());
+
     Chat_Utils.imprimirAjuda();
     Chat_Utils.imprimirComandos();
     prompt = "["+USUARIO+"] >> ";
@@ -227,6 +242,20 @@ public class Chat {
                       else
                           System.out.println("Comando inválido.");
                   }
+                  else if(comando.equals("listUsers")) //listar usuários de um dado grupo
+                  {
+                      if(argumentos.length == 2)
+                          listarUsuariosDoGrupo(argumentos[1]);
+                      else
+                          System.out.println("Comando inválido.");
+                  }
+                  else if(comando.equals("listGroups")) //listar os grupos dos quais o usuário atual faz parte
+                  {
+                      if(argumentos.length == 1)
+                          listarGruposDoUsuario(USUARIO);
+                      else
+                          System.out.println("Comando inválido.");
+                  }
                   else
                       System.out.println("Comando inválido.");
                   break;
@@ -291,6 +320,83 @@ public class Chat {
           System.out.println(" !! Erro no canal. Reinicie o chat !! ");
           ace.printStackTrace();
           System.out.print(prompt);
+      }
+  }
+  
+  /*
+  * Função para listar todos os usuários de um dado grupo
+  */
+  public static void listarUsuariosDoGrupo(String grupo)
+  {
+      Gson gson = new Gson();
+      Client client = ClientBuilder.newClient();
+      Response resposta = client.target( restResource )
+          .path("/api/exchanges/%2f/"+grupo+"/bindings/source") // lista todos os binds que tem o exchange grupo como source
+      	  .request(MediaType.APPLICATION_JSON)
+          .header( authHeaderName, authHeaderValue )
+          .get();
+      
+      if (resposta.getStatus() == 200) {
+        String json = resposta.readEntity(String.class);
+        Usuario[] usuarios = gson.fromJson(json, Usuario[].class);
+        if(usuarios.length > 0 && usuarios[0].get().endsWith("-F"))
+            System.out.print(usuarios[0].get().substring(0,usuarios[0].get().length()-2));
+        for (int i = 1; i < usuarios.length; i++){
+            if(usuarios[i].get().endsWith("-F"))
+              System.out.print(", "+usuarios[i].get().substring(0,usuarios[i].get().length()-2));
+        }
+        System.out.println();
+      } 
+      else System.out.println("Erro "+resposta.getStatus());
+  }
+  
+  /*
+  * Função para listar todos os grupos de um dado usuário
+  */
+  public static void listarGruposDoUsuario(String usuario)
+  {
+      Client client = ClientBuilder.newClient();
+      Response resposta = client.target( restResource )
+          .path("/api/queues/%2f/"+usuario+"-T/bindings") //
+      	  .request(MediaType.APPLICATION_JSON)
+          .header( authHeaderName, authHeaderValue )
+          .get();
+      if (resposta.getStatus() == 200) {
+        Gson gson = new Gson();
+      	String json = resposta.readEntity(String.class);
+      	Grupo[] grupos = gson.fromJson(json, Grupo[].class);
+        for (int i = 0; i < grupos.length-1; i++) {
+            if(!(grupos[i].getSource().isEmpty()))
+              System.out.print(grupos[i].getSource()+", ");
+        }
+        System.out.println(grupos[grupos.length-1].getSource());
+      } else {
+        System.out.println("Erro "+resposta.getStatus());
+      }
+  }
+  
+  public static void listarExchanges()
+  {
+      Client client = ClientBuilder.newClient();
+      Response resposta = client.target( restResource )
+        .path("/api/exchanges") //
+    	  .request(MediaType.APPLICATION_JSON)
+        .header( authHeaderName, authHeaderValue )
+        .get();
+    
+      if (resposta.getStatus() == 200) {
+        //return resposta;
+      	String json = resposta.readEntity(String.class);
+      	GsonBuilder builder = new GsonBuilder();
+        builder.setPrettyPrinting();
+        Gson gson = builder.create();
+        Grupo[] exchanges = gson.fromJson(json, Grupo[].class);
+        System.out.print("Exchanges: ");
+        for (int i = 0; i < exchanges.length; i++)
+            System.out.print(exchanges[i].getName()+", ");
+        System.out.println();
+      } else {
+        System.out.println(resposta.getStatus());
       }
   }
   

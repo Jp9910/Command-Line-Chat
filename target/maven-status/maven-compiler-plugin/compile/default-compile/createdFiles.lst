@@ -1,6 +1,8 @@
 br/ufs/dcomp/ChatRabbitMQ/MensagemProto$MensagemOrBuilder.class
+br/ufs/dcomp/ChatRabbitMQ/Grupo.class
 br/ufs/dcomp/ChatRabbitMQ/ThreadRecebimento.class
 br/ufs/dcomp/ChatRabbitMQ/MensagemProto$Conteudo.class
+br/ufs/dcomp/ChatRabbitMQ/Usuario.class
 br/ufs/dcomp/ChatRabbitMQ/MensagemProto$Mensagem.class
 br/ufs/dcomp/ChatRabbitMQ/Chat_Utils.class
 br/ufs/dcomp/ChatRabbitMQ/ThreadEnvio.class
